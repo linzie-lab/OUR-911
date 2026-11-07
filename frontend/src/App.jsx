@@ -1,4 +1,5 @@
 import { Link, Route, Routes } from "react-router-dom";
+import FirstAidCompanion from "./pages/FirstAidCompanion.jsx";
 
 function HomePage() {
   return (
@@ -11,14 +12,13 @@ function HomePage() {
           OUR 911
         </h1>
         <p className="mt-6 max-w-xl text-lg leading-8 text-slate-300">
-          The project foundation is ready. Application modules can be added here
-          as the team defines them.
+          Find practical, step-by-step guidance for common campus emergencies.
         </p>
         <Link
           className="mt-8 inline-flex rounded-lg bg-cyan-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-400"
-          to="/"
+          to="/first-aid"
         >
-          Home
+          Open First Aid Companion
         </Link>
       </div>
     </main>
@@ -29,6 +29,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/first-aid" element={<FirstAidCompanion />} />
       <Route path="*" element={<HomePage />} />
     </Routes>
   );

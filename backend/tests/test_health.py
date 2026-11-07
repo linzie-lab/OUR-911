@@ -1,6 +1,9 @@
 import unittest
 
+from sqlalchemy import inspect
+
 from app import create_app
+from app.extensions import db
 
 
 class HealthEndpointTestCase(unittest.TestCase):
@@ -18,6 +21,22 @@ class HealthEndpointTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {"status": "ok"})
+
+    def test_database_tables_are_initialized(self):
+        expected_tables = {
+            "users",
+            "facilities",
+            "first_aid_guides",
+            "incidents",
+            "incident_updates",
+            "donors",
+            "blood_requests",
+            "donor_matches",
+            "campus_zones",
+        }
+
+        with self.app.app_context():
+            self.assertEqual(set(inspect(db.engine).get_table_names()), expected_tables)
 
 
 if __name__ == "__main__":

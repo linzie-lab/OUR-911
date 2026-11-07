@@ -5,11 +5,18 @@ from flask_cors import CORS
 
 from app.config import Config
 from app.extensions import db, jwt
+from app import models
+from app.routes.auth import auth_bp
 from app.routes.health import health_bp
 
 
 def create_app(test_config=None):
-    app = Flask(__name__, instance_relative_config=True)
+    instance_path = Path(__file__).resolve().parent.parent / "instance"
+    app = Flask(
+        __name__,
+        instance_path=str(instance_path),
+        instance_relative_config=True,
+    )
     app.config.from_object(Config)
     if test_config:
         app.config.update(test_config)
@@ -31,5 +38,9 @@ def create_app(test_config=None):
         },
     )
     app.register_blueprint(health_bp, url_prefix="/api")
+    app.register_blueprint(auth_bp, url_prefix="/api/auth")
+
+    with app.app_context():
+        db.create_all()
 
     return app
