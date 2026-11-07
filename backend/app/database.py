@@ -82,6 +82,12 @@ def migrate_incident_reporters_nullable():
 SQLITE_ADDITIONS = {
     "incidents": {
         "contact_info": "VARCHAR(120)",
+        "latitude": "FLOAT",
+        "longitude": "FLOAT",
+        "assigned_responder_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL",
+    },
+    "users": {
+        "responder_approved": "BOOLEAN NOT NULL DEFAULT 0",
     },
     "donors": {
         "location": "VARCHAR(160)",
@@ -106,6 +112,11 @@ def migrate_sqlite_schema():
 
     migrate_incident_reporters_nullable()
     with db.engine.begin() as connection:
+        user_columns = {
+            row[1]
+            for row in connection.exec_driver_sql("PRAGMA table_info(users)")
+        }
+        add_responder_approval = "responder_approved" not in user_columns
         for table_name, additions in SQLITE_ADDITIONS.items():
             result = connection.exec_driver_sql(
                 f"PRAGMA table_info({table_name})"
@@ -117,3 +128,12 @@ def migrate_sqlite_schema():
                         f"ALTER TABLE {table_name} "
                         f"ADD COLUMN {column_name} {definition}"
                     )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_incidents_assigned_responder_id "
+            "ON incidents (assigned_responder_id)"
+        )
+        if add_responder_approval:
+            connection.exec_driver_sql(
+                "UPDATE users SET responder_approved = 1 "
+                "WHERE role = 'health_personnel'"
+            )

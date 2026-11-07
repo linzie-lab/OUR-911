@@ -18,6 +18,7 @@ class User(TimestampMixin, db.Model):
     email = db.Column(db.String(255), nullable=False, unique=True, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
     role = db.Column(db.String(32), nullable=False, default="student")
+    responder_approved = db.Column(db.Boolean, nullable=False, default=False)
 
     authored_guides = db.relationship(
         "FirstAidGuide",
@@ -40,6 +41,11 @@ class User(TimestampMixin, db.Model):
     blood_requests = db.relationship(
         "BloodRequest",
         back_populates="requested_by",
+    )
+    assigned_incidents = db.relationship(
+        "Incident",
+        back_populates="assigned_responder",
+        foreign_keys="Incident.assigned_responder_id",
     )
 
     def set_password(self, password):

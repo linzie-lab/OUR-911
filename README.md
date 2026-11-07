@@ -69,7 +69,9 @@ The command prompts for name, email, role, and a hidden password. It supports
    emergency services or professional training.
 3. **Incident Reporting** — signed-in users submit and track their own reports;
    guests can submit an emergency report without an account but cannot retrieve
-   or track it. Authorized staff review the campus queue and add status history.
+   or track it. Reports can include browser GPS coordinates or a manually
+   entered location. Approved responders review the queue, accept or reject
+   reports, record status history and notes; administrators can assign reports.
    Staff can configure campus location choices.
 4. **Health Intelligence** — staff-only statistics, categories, trends, and
    frequent locations computed from incident records. No reporter identity,
@@ -81,6 +83,18 @@ The command prompts for name, email, role, and a hidden password. It supports
 6. **Health Facility Directory** — public search and details; administrators
    manage records. Facilities are not seeded with fictional names or contacts,
    and unverified records are labelled.
+7. **Emergency SOS and contacts** — the dashboard SOS action confirms intent,
+   requests GPS permission and submits a high-priority incident, with manual
+   location fallback. Verified emergency contacts use telephone links. Kenya's
+   general emergency numbers 999 and 112 are preconfigured; other ambulance
+   and facility contacts must be independently verified by an administrator.
+   OUR 911 is not a dispatch service; call emergency services directly for
+   immediate danger.
+8. **Unified role-based operations** — the same dashboard serves normal users,
+   approved emergency responders and administrators. Administrators manage
+   responder approval, user roles, incident assignment and verified contacts
+   from `/admin`. Server-side authorization protects administrative and
+   responder operations.
 
 ## API overview
 
@@ -89,7 +103,13 @@ The command prompts for name, email, role, and a hidden password. It supports
 - `GET /api/health`
 - `GET|POST /api/incidents`, `POST /api/incidents/guest`,
   `GET /api/incidents/mine`, `GET /api/incidents/<id>`,
-  `PATCH /api/incidents/<id>/status`
+  `PATCH /api/incidents/<id>/status`, `GET /api/incidents/queue`,
+  `POST /api/incidents/<id>/accept|reject|assign`
+- `GET /api/emergency-contacts` (verified active contacts only)
+- `GET|POST /api/admin/contacts`, `PATCH|DELETE /api/admin/contacts/<id>`,
+  `GET /api/admin/users`, `PATCH /api/admin/users/<id>`,
+  `GET /api/admin/summary`
+- `GET /api/notifications`, `PATCH /api/notifications/<id>/read`
 - `GET|POST /api/campus-zones`
 - `GET /api/intelligence/summary` (admin or health personnel)
 - `GET /api/facilities/summary`, `GET|POST /api/facilities`,

@@ -20,6 +20,7 @@ from app.routes.auth import auth_bp
 from app.routes.health import health_bp
 from app.routes.incidents import incidents_bp
 from app.routes.intelligence import intelligence_bp
+from app.routes.admin import admin_bp, contact_bp, notification_bp
 
 
 def create_app(test_config=None):
@@ -68,10 +69,33 @@ def create_app(test_config=None):
     app.register_blueprint(damu_bp, url_prefix="/api/damu")
     app.register_blueprint(facilities_bp, url_prefix="/api/facilities")
     app.register_blueprint(campus_bp, url_prefix="/api/campus-zones")
+    app.register_blueprint(admin_bp, url_prefix="/api/admin")
+    app.register_blueprint(contact_bp, url_prefix="/api/emergency-contacts")
+    app.register_blueprint(notification_bp, url_prefix="/api/notifications")
 
     with app.app_context():
         db.create_all()
         migrate_sqlite_schema()
+        from app.models import EmergencyContact
+
+        for phone in ("999", "112"):
+            contact = db.session.scalar(
+                select(EmergencyContact).where(
+                    EmergencyContact.category == "general",
+                    EmergencyContact.phone == phone,
+                )
+            )
+            if contact is None:
+                db.session.add(
+                    EmergencyContact(
+                        name="Kenya emergency services",
+                        category="general",
+                        phone=phone,
+                        is_verified=True,
+                        is_active=True,
+                    )
+                )
+        db.session.commit()
 
     @app.cli.command("create-user")
     def create_user_command():
@@ -98,6 +122,7 @@ def create_app(test_config=None):
             user.full_name = full_name
             user.role = role
         user.password_hash = generate_password_hash(password)
+        user.responder_approved = role == "health_personnel"
         db.session.commit()
         click.echo(f"Account {email} is now configured as {role}.")
 

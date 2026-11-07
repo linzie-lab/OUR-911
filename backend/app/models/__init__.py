@@ -4,7 +4,7 @@ from app.models.campus import CampusZone
 from app.models.donors import Donor
 from app.models.facilities import Facility
 from app.models.guides import FirstAidGuide
-from app.models.incidents import Incident, IncidentUpdate
+from app.models.incidents import EmergencyContact, Incident, IncidentUpdate, Notification
 from app.models.users import User
 
 __all__ = [
@@ -12,10 +12,12 @@ __all__ = [
     "CampusZone",
     "Donor",
     "DonorMatch",
+    "EmergencyContact",
     "Facility",
     "FirstAidGuide",
     "Incident",
     "IncidentUpdate",
+    "Notification",
     "TimestampMixin",
     "User",
 ]

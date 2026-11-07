@@ -52,7 +52,12 @@ class PlatformApiTestCase(unittest.TestCase):
 
     @staticmethod
     def _add_user(email, role, name):
-        user = User(email=email, role=role, full_name=name)
+        user = User(
+            email=email,
+            role=role,
+            full_name=name,
+            responder_approved=role == "health_personnel",
+        )
         user.set_password("test-password-123")
         db.session.add(user)
         db.session.commit()
@@ -130,14 +135,22 @@ class PlatformApiTestCase(unittest.TestCase):
             403,
         )
 
+        accepted = self.client.post(
+            f"/api/incidents/{incident['id']}/accept",
+            headers=self._auth(self.health_token),
+        )
+        self.assertEqual(accepted.status_code, 200)
+        self.assertEqual(accepted.get_json()["incident"]["response_status"], "accepted")
+
         updated = self.client.patch(
             f"/api/incidents/{incident['id']}/status",
-            json={"status": "under_review", "message": "Staff reviewing."},
+            json={"status": "responding", "message": "Responder is on the way."},
             headers=self._auth(self.health_token),
         )
         self.assertEqual(updated.status_code, 200)
         self.assertEqual(updated.get_json()["incident"]["status"], "under_review")
-        self.assertEqual(len(updated.get_json()["incident"]["history"]), 2)
+        self.assertEqual(updated.get_json()["incident"]["response_status"], "responding")
+        self.assertEqual(len(updated.get_json()["incident"]["history"]), 3)
 
         resolved = self.client.patch(
             f"/api/incidents/{incident['id']}/status",
@@ -194,6 +207,164 @@ class PlatformApiTestCase(unittest.TestCase):
         self.assertEqual(len(staff_reports), 1)
         self.assertNotIn("reporter", staff_reports[0])
         self.assertEqual(staff_reports[0]["contact_info"], "555-0123")
+
+    def test_sos_coordinates_responder_approval_and_private_notifications(self):
+        created = self._report_incident(
+            self.student_token,
+            category="fire",
+            description="Smoke reported in the science building.",
+            location="Science building, north entrance",
+            latitude=-1.2864,
+            longitude=36.8172,
+            severity="critical",
+        )
+        self.assertEqual(created.status_code, 201)
+        incident_id = created.get_json()["incident"]["id"]
+        self.assertEqual(created.get_json()["incident"]["response_status"], "pending")
+
+        queue = self.client.get(
+            "/api/incidents/queue",
+            headers=self._auth(self.health_token),
+        )
+        queued_incident = queue.get_json()["incidents"][0]
+        self.assertEqual(queued_incident["latitude"], -1.2864)
+        self.assertEqual(queued_incident["longitude"], 36.8172)
+        self.assertEqual(queued_incident["reporter"]["id"], self.student.id)
+
+        accepted = self.client.post(
+            f"/api/incidents/{incident_id}/accept",
+            headers=self._auth(self.health_token),
+        )
+        self.assertEqual(accepted.status_code, 200)
+        self.assertEqual(accepted.get_json()["incident"]["response_status"], "accepted")
+        notifications = self.client.get(
+            "/api/notifications",
+            headers=self._auth(self.student_token),
+        ).get_json()["notifications"]
+        self.assertTrue(any("accepted" in item["message"] for item in notifications))
+
+    def test_unapproved_responder_is_blocked_and_admin_can_approve(self):
+        with self.app.app_context():
+            responder = User(
+                full_name="Pending Responder",
+                email="pending-responder@example.test",
+                role="health_personnel",
+                responder_approved=False,
+            )
+            responder.set_password("test-password-123")
+            db.session.add(responder)
+            db.session.commit()
+            responder_token = self._token(responder.id)
+            responder_id = responder.id
+
+        self.assertEqual(
+            self.client.get(
+                "/api/incidents/queue",
+                headers=self._auth(responder_token),
+            ).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.client.get(
+                "/api/damu/admin/donors",
+                headers=self._auth(responder_token),
+            ).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.client.get(
+                "/api/intelligence/summary",
+                headers=self._auth(responder_token),
+            ).status_code,
+            403,
+        )
+        approval = self.client.patch(
+            f"/api/admin/users/{responder_id}",
+            json={"responder_approved": True},
+            headers=self._auth(self.admin_token),
+        )
+        self.assertEqual(approval.status_code, 200)
+        self.assertTrue(approval.get_json()["user"]["responder_approved"])
+        self.assertEqual(
+            self.client.get(
+                "/api/incidents/queue",
+                headers=self._auth(responder_token),
+            ).status_code,
+            200,
+        )
+
+    def test_only_verified_emergency_contacts_are_public(self):
+        default_contacts = self.client.get("/api/emergency-contacts")
+        self.assertEqual(default_contacts.status_code, 200)
+        self.assertEqual(
+            {contact["phone"] for contact in default_contacts.get_json()["contacts"]},
+            {"999", "112"},
+        )
+        created = self.client.post(
+            "/api/admin/contacts",
+            json={
+                "name": "Campus ambulance",
+                "category": "ambulance",
+                "phone": "+254700000000",
+            },
+            headers=self._auth(self.admin_token),
+        )
+        self.assertEqual(created.status_code, 201)
+        contact_id = created.get_json()["contact"]["id"]
+        self.assertEqual(
+            len(self.client.get("/api/emergency-contacts").get_json()["contacts"]),
+            2,
+        )
+        verified = self.client.patch(
+            f"/api/admin/contacts/{contact_id}",
+            json={"is_verified": True},
+            headers=self._auth(self.admin_token),
+        )
+        self.assertTrue(verified.get_json()["contact"]["is_verified"])
+        self.assertEqual(
+            len(self.client.get("/api/emergency-contacts").get_json()["contacts"]),
+            3,
+        )
+        self.assertEqual(
+            self.client.get(
+                "/api/admin/contacts",
+                headers=self._auth(self.student_token),
+            ).status_code,
+            403,
+        )
+
+    def test_admin_assignment_and_responder_rejection_are_audited(self):
+        created = self._report_incident(self.student_token)
+        incident_id = created.get_json()["incident"]["id"]
+        assigned = self.client.post(
+            f"/api/incidents/{incident_id}/assign",
+            json={"responder_id": self.health_worker.id},
+            headers=self._auth(self.admin_token),
+        )
+        self.assertEqual(assigned.status_code, 200)
+        self.assertEqual(
+            assigned.get_json()["incident"]["assigned_responder"]["id"],
+            self.health_worker.id,
+        )
+
+        rejected = self.client.post(
+            f"/api/incidents/{incident_id}/reject",
+            json={"reason": "Duplicate report; responder contacted the reporter."},
+            headers=self._auth(self.health_token),
+        )
+        self.assertEqual(rejected.status_code, 200)
+        self.assertEqual(rejected.get_json()["incident"]["response_status"], "rejected")
+        self.assertEqual(
+            rejected.get_json()["incident"]["history"][-1]["message"],
+            "Duplicate report; responder contacted the reporter.",
+        )
+        responder_notifications = self.client.get(
+            "/api/notifications",
+            headers=self._auth(self.health_token),
+        ).get_json()["notifications"]
+        self.assertTrue(
+            any(item["title"] == "Incident assigned to you" for item in responder_notifications)
+        )
 
     def test_public_summary_endpoints_return_live_database_counts(self):
         self.assertEqual(

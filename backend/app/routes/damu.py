@@ -4,7 +4,7 @@ from flask import Blueprint, g, jsonify, request
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from app.auth.decorators import role_required
+from app.auth.decorators import responder_required, role_required
 from app.extensions import db
 from app.models import BloodRequest, Donor, DonorMatch
 from app.routes.common import error_response, json_object, required_text
@@ -161,7 +161,7 @@ def update_my_donor_profile():
 
 
 @damu_bp.get("/admin/donors")
-@role_required("admin", "health_personnel")
+@responder_required
 def list_donors():
     statement = select(Donor).join(Donor.user)
     blood_type = request.args.get("blood_type")
@@ -246,7 +246,10 @@ def create_blood_request():
 @role_required("student", "admin", "health_personnel")
 def list_blood_requests():
     statement = select(BloodRequest).order_by(BloodRequest.created_at.desc())
-    is_staff = g.current_user.role in {"admin", "health_personnel"}
+    is_staff = g.current_user.role == "admin" or (
+        g.current_user.role == "health_personnel"
+        and g.current_user.responder_approved
+    )
     if not is_staff:
         statement = statement.where(
             BloodRequest.requested_by_id == g.current_user.id
@@ -263,7 +266,7 @@ def list_blood_requests():
 
 
 @damu_bp.patch("/requests/<int:request_id>/status")
-@role_required("admin", "health_personnel")
+@responder_required
 def update_request_status(request_id):
     blood_request = db.session.get(BloodRequest, request_id)
     if blood_request is None:
@@ -280,7 +283,7 @@ def update_request_status(request_id):
 
 
 @damu_bp.get("/requests/<int:request_id>/matches")
-@role_required("admin", "health_personnel")
+@responder_required
 def find_donor_matches(request_id):
     blood_request = db.session.get(BloodRequest, request_id)
     if blood_request is None:
@@ -309,7 +312,7 @@ def find_donor_matches(request_id):
 
 
 @damu_bp.post("/requests/<int:request_id>/matches")
-@role_required("admin", "health_personnel")
+@responder_required
 def record_donor_match(request_id):
     blood_request = db.session.get(BloodRequest, request_id)
     if blood_request is None:
@@ -352,7 +355,7 @@ def record_donor_match(request_id):
 
 
 @damu_bp.patch("/matches/<int:match_id>")
-@role_required("admin", "health_personnel")
+@responder_required
 def update_match_outcome(match_id):
     match = db.session.get(DonorMatch, match_id)
     if match is None:

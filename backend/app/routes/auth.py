@@ -32,6 +32,7 @@ def _serialize_user(user):
         "full_name": user.full_name,
         "email": user.email,
         "role": user.role,
+        "responder_approved": user.responder_approved,
     }
 
 

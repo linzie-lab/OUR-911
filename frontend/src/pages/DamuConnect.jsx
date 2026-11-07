@@ -15,7 +15,9 @@ function pretty(value) {
 export default function DamuConnect() {
   const { user, guest } = useAuth();
   const location = useLocation();
-  const staff = ["admin", "health_personnel"].includes(user?.role);
+  const staff = user?.role === "admin" || (
+    user?.role === "health_personnel" && user?.responder_approved
+  );
   const [donor, setDonor] = useState(null);
   const [donorForm, setDonorForm] = useState({ blood_type: "O+", phone: "", location: "" });
   const [requests, setRequests] = useState([]);

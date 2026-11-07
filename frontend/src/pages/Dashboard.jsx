@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { EmptyState, Loading, Notice } from "../components/Ui.jsx";
-import { useAuth } from "../context/AuthContext.jsx";
+import { getApiError, useAuth } from "../context/AuthContext.jsx";
 import api from "../lib/api.js";
 
 const services = [
@@ -60,6 +60,10 @@ const services = [
 const statusNames = {
   submitted: "Submitted",
   under_review: "Under review",
+  pending: "Pending",
+  accepted: "Accepted",
+  responding: "Responding",
+  rejected: "Rejected",
   resolved: "Resolved",
 };
 
@@ -86,6 +90,83 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sosOpen, setSosOpen] = useState(false);
+  const [sosBusy, setSosBusy] = useState(false);
+  const [sosError, setSosError] = useState("");
+  const [sosResult, setSosResult] = useState("");
+  const [locationMessage, setLocationMessage] = useState("");
+  const [sosForm, setSosForm] = useState({
+    category: "medical_emergency",
+    description: "",
+    location: "",
+    latitude: null,
+    longitude: null,
+  });
+
+  function requestLocation() {
+    if (!navigator.geolocation) {
+      setLocationMessage("GPS is unavailable in this browser. Enter a location manually.");
+      return;
+    }
+    setLocationMessage("Requesting your location…");
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setSosForm((current) => ({
+          ...current,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        }));
+        setLocationMessage("GPS location attached. Add a landmark or description if helpful.");
+      },
+      () => {
+        setSosForm((current) => ({ ...current, latitude: null, longitude: null }));
+        setLocationMessage("GPS was unavailable or permission was denied. Enter your location below.");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
+    );
+  }
+
+  function openSosForm() {
+    if (!window.confirm("Do you need emergency assistance? Continue to prepare an emergency report.")) {
+      return;
+    }
+    setSosOpen(true);
+    setSosError("");
+    setSosResult("");
+    requestLocation();
+  }
+
+  async function submitSos(event) {
+    event.preventDefault();
+    setSosBusy(true);
+    setSosError("");
+    setSosResult("");
+    try {
+      const { data: result } = await api.post(user ? "/incidents" : "/incidents/guest", {
+        category: sosForm.category,
+        description: sosForm.description.trim(),
+        location: sosForm.location.trim(),
+        latitude: sosForm.latitude,
+        longitude: sosForm.longitude,
+        severity: "high",
+      });
+      setSosResult(
+        `Report reference OUR-${result.incident?.id ?? result.report_id}. ${
+          user ? "Track its status in My Reports." : "This guest report cannot be retrieved later."
+        }`,
+      );
+      if (user) {
+        setData((current) => current && ({
+          ...current,
+          reports: [result.incident, ...current.reports],
+        }));
+      }
+    } catch (requestError) {
+      setSosError(getApiError(requestError));
+    } finally {
+      setSosBusy(false);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -125,7 +206,9 @@ export default function Dashboard() {
     year: "numeric",
   }).format(new Date());
   const firstName = user?.full_name.split(/\s+/)[0] ?? "there";
-  const isStaff = ["admin", "health_personnel"].includes(user?.role);
+  const isStaff = user?.role === "admin" || (
+    user?.role === "health_personnel" && user?.responder_approved
+  );
 
   return (
     <main className="space-y-8 pb-4">
@@ -158,11 +241,11 @@ export default function Dashboard() {
               </div>
             )}
             <div className="mt-6 flex flex-wrap gap-2">
-              <Link className="inline-flex items-center gap-2 rounded-xl bg-[#d6283f] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-rose-950/20 transition hover:bg-[#bd1e35] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" to="/incidents">
+              <button className="inline-flex items-center gap-2 rounded-xl bg-[#d6283f] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-rose-950/20 transition hover:bg-[#bd1e35] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={openSosForm} type="button">
                 <span aria-hidden="true" className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20">!</span>
-                Get emergency assistance
+                SOS · Report an emergency
                 <span aria-hidden="true">→</span>
-              </Link>
+              </button>
               <Link className="rounded-xl border border-white/25 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/15" to="/first-aid">Open First Aid Guide</Link>
             </div>
             <p className="mt-3 text-[11px] leading-5 text-slate-300">
@@ -185,6 +268,61 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
+
+      {sosOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-3 sm:p-6" role="presentation">
+          <section aria-labelledby="sos-title" aria-modal="true" className="max-h-[95vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-7" role="dialog">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-rose-700">Emergency report</p>
+                <h2 className="mt-1 text-xl font-bold text-slate-950" id="sos-title">Do you need emergency assistance?</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">For immediate danger, call emergency services now. Submitting here notifies OUR 911 responders; it does not dispatch an ambulance.</p>
+              </div>
+              <button aria-label="Close emergency report" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100" onClick={() => setSosOpen(false)} type="button">Close</button>
+            </div>
+            {sosError && <div className="mt-4"><Notice kind="error">{sosError}</Notice></div>}
+            {sosResult ? (
+              <div className="mt-5">
+                <Notice kind="success">{sosResult}</Notice>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {user && <Link className="rounded-lg bg-teal-800 px-4 py-2.5 text-sm font-semibold text-white" to="/incidents#my-reports" onClick={() => setSosOpen(false)}>View My Reports</Link>}
+                  <button className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold" onClick={() => setSosOpen(false)} type="button">Close</button>
+                </div>
+              </div>
+            ) : (
+              <form className="mt-5 space-y-4" onSubmit={submitSos}>
+                <label className="block text-sm font-semibold text-slate-800">
+                  Emergency type
+                  <select className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5" onChange={(event) => setSosForm((current) => ({ ...current, category: event.target.value }))} value={sosForm.category}>
+                    <option value="medical_emergency">Medical emergency</option>
+                    <option value="accident">Accident</option>
+                    <option value="fire">Fire</option>
+                    <option value="security_emergency">Security emergency</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p aria-live="polite" className="text-sm text-slate-700">{locationMessage}</p>
+                  <button className="mt-2 text-sm font-semibold text-teal-800 underline" onClick={requestLocation} type="button">Try GPS again</button>
+                  {sosForm.latitude !== null && <p className="mt-1 text-xs text-slate-500">Coordinates attached: {sosForm.latitude.toFixed(5)}, {sosForm.longitude.toFixed(5)}</p>}
+                </div>
+                <label className="block text-sm font-semibold text-slate-800">
+                  Location or nearby landmark <span className="font-normal text-slate-500">(required if GPS unavailable)</span>
+                  <input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5" maxLength={255} onChange={(event) => setSosForm((current) => ({ ...current, location: event.target.value }))} placeholder="Building, road, campus zone or landmark" required={sosForm.latitude === null} value={sosForm.location} />
+                </label>
+                <label className="block text-sm font-semibold text-slate-800">
+                  Brief description
+                  <textarea className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5" maxLength={5000} onChange={(event) => setSosForm((current) => ({ ...current, description: event.target.value }))} placeholder="What happened and what help is needed?" required rows={3} value={sosForm.description} />
+                </label>
+                <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+                  <button className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setSosOpen(false)} type="button">Cancel / Go back</button>
+                  <button className="rounded-lg bg-[#c91f35] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#a9182b] disabled:opacity-60" disabled={sosBusy} type="submit">{sosBusy ? "Submitting…" : "Submit emergency report"}</button>
+                </div>
+              </form>
+            )}
+          </section>
+        </div>
+      )}
 
       {error && <Notice kind="error">{error}</Notice>}
       <section>

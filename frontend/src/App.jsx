@@ -5,6 +5,7 @@ import { Loading } from "./components/Ui.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import AuthPage from "./pages/AuthPage.jsx";
 import ActivityPage from "./pages/ActivityPage.jsx";
+import AdminConsole from "./pages/AdminConsole.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import DamuConnect from "./pages/DamuConnect.jsx";
 import EmergencyContacts from "./pages/EmergencyContacts.jsx";
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="/activity" element={<ActivityPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<ProfilePage settings />} />
+          <Route path="/admin" element={<AdminConsole />} />
           <Route path="/emergency-contacts" element={<EmergencyContacts />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route

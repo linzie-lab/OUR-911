@@ -73,7 +73,9 @@ export default function IntelligenceDashboard() {
     return () => { active = false; };
   }, []);
 
-  if (!["admin", "health_personnel"].includes(user?.role)) {
+  if (user?.role !== "admin" && !(
+    user?.role === "health_personnel" && user?.responder_approved
+  )) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <PageHeader title="Health Intelligence" description="Aggregate, privacy-preserving campus health indicators." />

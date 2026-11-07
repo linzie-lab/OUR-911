@@ -148,10 +148,18 @@ export default function AppShell() {
                 </div>
               </section>
             ))}
-            {(user?.role === "admin" || user?.role === "health_personnel") && (
+            {(user?.role === "admin" || (
+              user?.role === "health_personnel" && user?.responder_approved
+            )) && (
               <section>
                 <h2 className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Staff workspace</h2>
                 <NavLink className="mt-2 flex rounded-xl px-3 py-2.5 text-[13px] font-medium text-slate-600 hover:bg-white" to="/intelligence">Health Intelligence</NavLink>
+              </section>
+            )}
+            {user?.role === "admin" && (
+              <section>
+                <h2 className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Administration</h2>
+                <NavLink className={({ isActive: active }) => `mt-2 flex rounded-xl px-3 py-2.5 text-[13px] font-medium ${active ? "bg-teal-50 text-teal-900" : "text-slate-600 hover:bg-white"}`} to="/admin">System administration</NavLink>
               </section>
             )}
             {!user && guest && (
@@ -203,7 +211,9 @@ export default function AppShell() {
                   </div>
                 </section>
               ))}
-              {(user?.role === "admin" || user?.role === "health_personnel") && (
+              {(user?.role === "admin" || (
+                user?.role === "health_personnel" && user?.responder_approved
+              )) && (
                 <section>
                   <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Staff workspace</h2>
                   <Link className="mt-1 block rounded-lg px-2 py-2 text-sm text-slate-700 hover:bg-teal-50" to="/intelligence">Health Intelligence</Link>

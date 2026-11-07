@@ -7,6 +7,7 @@ import api from "../lib/api.js";
 export default function ActivityPage() {
   const { user } = useAuth();
   const [reports, setReports] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(Boolean(user));
   const [error, setError] = useState("");
   const updates = reports
@@ -26,21 +27,55 @@ export default function ActivityPage() {
       return;
     }
     setLoading(true);
-    api.get("/incidents/mine")
-      .then(({ data }) => setReports(data.incidents))
+    Promise.all([api.get("/incidents/mine"), api.get("/notifications")])
+      .then(([reportResponse, notificationResponse]) => {
+        setReports(reportResponse.data.incidents);
+        setNotifications(notificationResponse.data.notifications);
+      })
       .catch((requestError) => setError(getApiError(requestError)))
       .finally(() => setLoading(false));
   }, [user]);
 
+  async function markRead(notificationId) {
+    setError("");
+    try {
+      await api.patch(`/notifications/${notificationId}/read`);
+      setNotifications((current) => current.map((item) => (
+        item.id === notificationId ? { ...item, is_read: true } : item
+      )));
+    } catch (requestError) {
+      setError(getApiError(requestError));
+    }
+  }
+
   return (
     <main className="mx-auto max-w-5xl">
-      <PageHeader eyebrow="My account" title="My Activity" description="A private timeline of reports submitted from your account." />
+      <PageHeader eyebrow="My account" title="My Activity" description="Your private incident timeline and response notifications." />
       {!user && <Notice><Link className="font-bold underline" to="/login">Sign in</Link> to view your account activity. Guest reports are not connected to a personal account.</Notice>}
       {error && <div className="mb-4"><Notice kind="error">{error}</Notice></div>}
-      {loading ? <Loading label="Loading your activity…" /> : user && !reports.length ? (
-        <EmptyState title="No activity to show">Your incident reports will appear here after you submit one.</EmptyState>
+      {loading ? <Loading label="Loading your activity…" /> : user && !reports.length && !notifications.length ? (
+        <EmptyState title="No activity to show">Incident reports and response notifications will appear here.</EmptyState>
       ) : user ? (
         <div className="space-y-7">
+          <section id="notifications">
+            <h2 className="mb-3 font-bold text-slate-950">Notifications</h2>
+            {notifications.length ? (
+              <ul className="space-y-2">
+                {notifications.map((item) => (
+                  <li className={`rounded-xl border p-4 ${item.is_read ? "border-slate-200 bg-white" : "border-teal-200 bg-teal-50"}`} key={item.id}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">{item.title}</p>
+                        <p className="mt-1 text-sm text-slate-700">{item.message}</p>
+                        <time className="mt-2 block text-xs text-slate-500" dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time>
+                      </div>
+                      {!item.is_read && <button className="text-xs font-bold text-teal-800 underline" onClick={() => markRead(item.id)} type="button">Mark as read</button>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No notifications yet.</p>}
+          </section>
           <section>
             <h2 className="mb-3 font-bold text-slate-950">Report updates</h2>
             <ol className="space-y-2">

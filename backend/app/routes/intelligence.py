@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from flask import Blueprint, jsonify
 from sqlalchemy import select
 
-from app.auth.decorators import role_required
+from app.auth.decorators import responder_required
 from app.extensions import db
 from app.models import Incident
 
@@ -12,7 +12,7 @@ intelligence_bp = Blueprint("intelligence", __name__)
 
 
 @intelligence_bp.get("/summary")
-@role_required("admin", "health_personnel")
+@responder_required
 def summary():
     incidents = db.session.scalars(
         select(Incident).order_by(Incident.created_at.desc())

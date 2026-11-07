@@ -50,6 +50,8 @@ class HealthEndpointTestCase(unittest.TestCase):
             "blood_requests",
             "donor_matches",
             "campus_zones",
+            "emergency_contacts",
+            "notifications",
         }
 
         with self.app.app_context():

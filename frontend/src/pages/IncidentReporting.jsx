@@ -9,16 +9,27 @@ const categories = [
   ["sudden_illness", "Sudden illness"],
   ["mental_health_concern", "Mental health concern"],
   ["accident", "Accident"],
+  ["fire", "Fire"],
+  ["security_emergency", "Security emergency"],
   ["other", "Other"],
 ];
 const severities = ["low", "medium", "high", "critical"];
-const statuses = ["submitted", "under_review", "resolved"];
+const statuses = ["pending", "accepted", "responding", "resolved"];
 
 function humanize(value) {
   return value?.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function IncidentCard({ incident, staff, onStatusChange, busyId }) {
+function responseStatus(incident) {
+  if (incident.response_status) return incident.response_status;
+  return {
+    submitted: "pending",
+    under_review: "responding",
+  }[incident.status] ?? incident.status;
+}
+
+function IncidentCard({ incident, staff, onStatusChange, onAccept, onReject, busyId }) {
+  const status = responseStatus(incident);
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -26,7 +37,7 @@ function IncidentCard({ incident, staff, onStatusChange, busyId }) {
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-bold text-slate-950">{humanize(incident.category)}</h3>
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-              {humanize(incident.status)}
+              {humanize(status)}
             </span>
             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
               incident.severity === "critical" || incident.severity === "high"
@@ -37,6 +48,14 @@ function IncidentCard({ incident, staff, onStatusChange, busyId }) {
             </span>
           </div>
           <p className="mt-2 text-sm text-slate-600">{incident.location || "Location not provided"}</p>
+          {staff && incident.latitude !== null && incident.latitude !== undefined && (
+            <a className="mt-1 inline-block text-xs font-semibold text-teal-800 underline" href={`https://maps.google.com/?q=${incident.latitude},${incident.longitude}`} rel="noreferrer" target="_blank">
+              Open reported coordinates in map
+            </a>
+          )}
+          {staff && incident.assigned_responder && (
+            <p className="mt-1 text-xs text-slate-500">Assigned to {incident.assigned_responder.name}</p>
+          )}
           {staff && incident.reporter && (
             <p className="mt-1 text-xs text-slate-500">
               Reported by {incident.reporter.name} · {incident.reporter.email}
@@ -72,22 +91,36 @@ function IncidentCard({ incident, staff, onStatusChange, busyId }) {
           </ol>
         </details>
       )}
-      {staff && incident.status !== "resolved" && (
+      {staff && status !== "resolved" && status !== "rejected" && (
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
-          <span className="text-sm font-semibold text-slate-700">Update status:</span>
-          {statuses
-            .filter((status) => status !== incident.status)
-            .map((status) => (
+          {status === "pending" && (
+            <>
+              <button
+                className="rounded-lg bg-teal-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-900 disabled:opacity-60"
+                disabled={busyId === incident.id}
+                onClick={() => onAccept(incident.id)}
+                type="button"
+              >Accept incident</button>
+              <button
+                className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-60"
+                disabled={busyId === incident.id}
+                onClick={() => onReject(incident.id)}
+                type="button"
+              >Reject with reason</button>
+            </>
+          )}
+          {status !== "pending" && <span className="text-sm font-semibold text-slate-700">Update status:</span>}
+          {statuses.filter((nextStatus) => nextStatus !== status).map((nextStatus) => (
+            nextStatus !== "pending" && status !== "pending" ? (
               <button
                 className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 disabled:opacity-60"
                 disabled={busyId === incident.id}
-                key={status}
-                onClick={() => onStatusChange(incident.id, status)}
+                key={nextStatus}
+                onClick={() => onStatusChange(incident.id, nextStatus)}
                 type="button"
-              >
-                {humanize(status)}
-              </button>
-            ))}
+              >{humanize(nextStatus)}</button>
+            ) : null
+          ))}
         </div>
       )}
     </article>
@@ -96,7 +129,9 @@ function IncidentCard({ incident, staff, onStatusChange, busyId }) {
 
 export default function IncidentReporting() {
   const { user, guest } = useAuth();
-  const staff = user?.role === "admin" || user?.role === "health_personnel";
+  const staff = user?.role === "admin" || (
+    user?.role === "health_personnel" && user?.responder_approved
+  );
   const [zones, setZones] = useState([]);
   const [incidents, setIncidents] = useState([]);
   const [form, setForm] = useState({
@@ -129,7 +164,12 @@ export default function IncidentReporting() {
       );
       const zoneRequest = api.get("/campus-zones");
       const incidentRequest = user
-        ? api.get(staff ? "/incidents" : "/incidents/mine", { params: staff ? params : {} })
+        ? api.get(
+          staff
+            ? user.role === "admin" ? "/incidents" : "/incidents/queue"
+            : "/incidents/mine",
+          { params: staff ? params : {} },
+        )
         : Promise.resolve({ data: { incidents: [] } });
       const [incidentResponse, zoneResponse] = await Promise.all([
         incidentRequest,
@@ -179,16 +219,51 @@ export default function IncidentReporting() {
   }
 
   async function updateStatus(incidentId, status) {
+    const message = window.prompt("Add a response note to the incident history:");
+    if (message === null) return;
     setBusyId(incidentId);
     setError("");
     try {
-      await api.patch(`/incidents/${incidentId}/status`, { status });
+      await api.patch(`/incidents/${incidentId}/status`, {
+        status,
+        ...(message.trim() ? { message: message.trim() } : {}),
+      });
       setNotice("Incident status updated.");
       await loadData();
     } catch (requestError) {
       setError(getApiError(requestError));
     } finally {
       setBusyId(null);
+    }
+
+    async function acceptIncident(incidentId) {
+      setBusyId(incidentId);
+      setError("");
+      try {
+        await api.post(`/incidents/${incidentId}/accept`);
+        setNotice("Incident accepted and assigned to you.");
+        await loadData();
+      } catch (requestError) {
+        setError(getApiError(requestError));
+      } finally {
+        setBusyId(null);
+      }
+    }
+
+    async function rejectIncident(incidentId) {
+      const reason = window.prompt("Enter the reason for rejecting this incident:");
+      if (!reason?.trim()) return;
+      setBusyId(incidentId);
+      setError("");
+      try {
+        await api.post(`/incidents/${incidentId}/reject`, { reason: reason.trim() });
+        setNotice("Incident reviewed and rejected with a recorded reason.");
+        await loadData();
+      } catch (requestError) {
+        setError(getApiError(requestError));
+      } finally {
+        setBusyId(null);
+      }
     }
   }
 
@@ -401,6 +476,8 @@ export default function IncidentReporting() {
                 incident={incident}
                 key={incident.id}
                 onStatusChange={updateStatus}
+                onAccept={acceptIncident}
+                onReject={rejectIncident}
                 staff={staff}
               />
             ))}
