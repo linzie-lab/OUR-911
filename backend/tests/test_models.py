@@ -20,6 +20,7 @@ class UserModelTestCase(unittest.TestCase):
 
     def tearDown(self):
         db.session.remove()
+        db.engine.dispose()
         self.app_context.pop()
 
     def test_password_is_hashed_and_can_be_verified(self):

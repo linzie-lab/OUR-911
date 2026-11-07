@@ -1,36 +1,62 @@
-import { Link, Route, Routes } from "react-router-dom";
+import { lazy, Suspense } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
+import AppShell from "./components/AppShell.jsx";
+import { Loading } from "./components/Ui.jsx";
+import { AuthProvider } from "./context/AuthContext.jsx";
+import AuthPage from "./pages/AuthPage.jsx";
+import ActivityPage from "./pages/ActivityPage.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
+import DamuConnect from "./pages/DamuConnect.jsx";
+import EmergencyContacts from "./pages/EmergencyContacts.jsx";
+import FacilityDirectory from "./pages/FacilityDirectory.jsx";
 import FirstAidCompanion from "./pages/FirstAidCompanion.jsx";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
+import IncidentReporting from "./pages/IncidentReporting.jsx";
+import PrivacyPage from "./pages/PrivacyPage.jsx";
+import ProfilePage from "./pages/ProfilePage.jsx";
+import WelcomePage from "./pages/WelcomePage.jsx";
+import { useAuth } from "./context/AuthContext.jsx";
+
+const IntelligenceDashboard = lazy(
+  () => import("./pages/IntelligenceDashboard.jsx"),
+);
 
 function HomePage() {
-  return (
-    <main className="min-h-screen bg-slate-950 px-6 py-16 text-slate-100">
-      <div className="mx-auto max-w-3xl">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-400">
-          Health hackathon project
-        </p>
-        <h1 className="mt-4 text-4xl font-bold tracking-tight sm:text-6xl">
-          OUR 911
-        </h1>
-        <p className="mt-6 max-w-xl text-lg leading-8 text-slate-300">
-          Find practical, step-by-step guidance for common campus emergencies.
-        </p>
-        <Link
-          className="mt-8 inline-flex rounded-lg bg-cyan-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-400"
-          to="/first-aid"
-        >
-          Open First Aid Companion
-        </Link>
-      </div>
-    </main>
-  );
+  const { user, guest, loading } = useAuth();
+  if (loading) return <Loading label="Loading your portal…" />;
+  return user || guest ? <Dashboard /> : <WelcomePage />;
 }
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/first-aid" element={<FirstAidCompanion />} />
-      <Route path="*" element={<HomePage />} />
-    </Routes>
+    <AuthProvider>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/welcome" element={<WelcomePage />} />
+          <Route path="/login" element={<AuthPage />} />
+          <Route path="/register" element={<AuthPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/incidents" element={<IncidentReporting />} />
+          <Route path="/activity" element={<ActivityPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/settings" element={<ProfilePage settings />} />
+          <Route path="/emergency-contacts" element={<EmergencyContacts />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route
+            path="/intelligence"
+            element={
+              <Suspense fallback={<Loading label="Loading Health Intelligence…" />}>
+                <IntelligenceDashboard />
+              </Suspense>
+            }
+          />
+          <Route path="/damuconnect" element={<DamuConnect />} />
+          <Route path="/facilities" element={<FacilityDirectory />} />
+          <Route path="*" element={<Navigate replace to="/" />} />
+        </Route>
+        <Route path="/first-aid" element={<FirstAidCompanion />} />
+      </Routes>
+    </AuthProvider>
   );
 }

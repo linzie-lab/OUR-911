@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { emergencyNotice, firstAidGuides } from "../data/firstAidGuides.js";
+import BrandMark from "../components/BrandMark.jsx";
 
 const iconPaths = {
   burn: (
@@ -253,17 +254,7 @@ export default function FirstAidCompanion() {
             className="flex items-center gap-3 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-700"
             to="/"
           >
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-800 text-sm font-black text-white">
-              911
-            </span>
-            <span>
-              <span className="block text-base font-bold tracking-tight text-slate-950">
-                OUR 911
-              </span>
-              <span className="block text-xs font-medium text-slate-500">
-                Campus health companion
-              </span>
-            </span>
+            <BrandMark />
           </Link>
           <span className="hidden items-center gap-2 rounded-full bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-900 sm:inline-flex">
             <span className="h-2 w-2 rounded-full bg-teal-600" />

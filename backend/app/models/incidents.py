@@ -19,7 +19,7 @@ class Incident(TimestampMixin, db.Model):
     reporter_id = db.Column(
         db.Integer,
         db.ForeignKey("users.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     facility_id = db.Column(
@@ -35,6 +35,7 @@ class Incident(TimestampMixin, db.Model):
     incident_type = db.Column(db.String(80), nullable=False)
     description = db.Column(db.Text, nullable=False)
     location_description = db.Column(db.String(255))
+    contact_info = db.Column(db.String(120))
     status = db.Column(db.String(32), nullable=False, default="reported")
     priority = db.Column(db.String(16), nullable=False, default="medium")
 

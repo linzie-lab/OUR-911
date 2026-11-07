@@ -20,6 +20,7 @@ class Donor(TimestampMixin, db.Model):
     )
     blood_type = db.Column(db.String(3), nullable=False)
     phone = db.Column(db.String(32), nullable=False)
+    location = db.Column(db.String(160))
     is_available = db.Column(db.Boolean, nullable=False, default=True)
     last_donation_at = db.Column(db.DateTime(timezone=True))
 

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" fill="none">
+  <defs><linearGradient id="bg" x1="32" y1="12" x2="601" y2="355" gradientUnits="userSpaceOnUse"><stop stop-color="#E9F3F8"/><stop offset="1" stop-color="#CFE3EE"/></linearGradient><linearGradient id="building" x1="204" y1="78" x2="440" y2="284" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"/><stop offset="1" stop-color="#DDEBF1"/></linearGradient></defs>
+  <rect width="640" height="360" rx="26" fill="url(#bg)"/><circle cx="523" cy="71" r="66" fill="#fff" fill-opacity=".55"/><path d="M0 275c111-36 215-27 312 0 112 31 220 25 328-11v96H0v-85Z" fill="#B9D5E1"/>
+  <path d="M190 122 320 60l130 62v167H190V122Z" fill="url(#building)" stroke="#fff" stroke-width="8"/><path d="M177 121 320 51l143 70H177Z" fill="#32627A"/>
+  <rect x="287" y="91" width="66" height="58" rx="13" fill="#E65360"/><path d="M320 102v36m-18-18h36" stroke="#fff" stroke-linecap="round" stroke-width="9"/>
+  <path d="M220 175h38v38h-38zm58 0h38v38h-38zm66 0h38v38h-38z" fill="#8CB7C7"/><path d="M294 289v-54c0-15 12-27 27-27s27 12 27 27v54h-54Z" fill="#6E9BAF"/>
+  <path d="M93 211c0-30 40-89 40-89s40 59 40 89a40 40 0 1 1-80 0Z" fill="#1D7180" fill-opacity=".9"/><circle cx="133" cy="207" r="17" fill="#fff"/><path d="M133 194v26m-13-13h26" stroke="#E65360" stroke-linecap="round" stroke-width="5"/>
+  <path d="M479 254c-12-13-33-4-33 11 0 16 33 33 33 33s33-17 33-33c0-15-21-24-33-11Z" fill="#E65360"/>
+  <path d="M93 84h48m-24-24v48" stroke="#fff" stroke-linecap="round" stroke-width="7"/>
+</svg>

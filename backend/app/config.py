@@ -14,3 +14,4 @@ class Config:
         for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
         if origin.strip()
     ]
+    CORS_ORIGINS.append(r"https?://(?:localhost|127\.0\.0\.1):\d+")

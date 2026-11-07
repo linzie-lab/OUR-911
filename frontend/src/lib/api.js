@@ -7,4 +7,12 @@ const api = axios.create({
   },
 });
 
+api.interceptors.request.use((config) => {
+  const token = window.localStorage.getItem("our911.accessToken");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export default api;

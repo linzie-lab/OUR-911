@@ -1,100 +1,162 @@
 # OUR 911
 
-OUR 911 is a health hackathon project with a React/Vite frontend and a modular
-Flask REST API. This repository contains the project foundation only; feature
-modules have not been implemented.
+**One unified response.** OUR 911 is an integrated emergency response and
+life-saving service platform. **Every second matters. Every life counts.**
+It provides
+first-aid guidance, private incident reporting, aggregate health insights,
+voluntary donor coordination, and a campus health facility directory. It is
+**not** an ambulance dispatch application.
 
-## Requirements
+## Technology
 
-- Node.js 18 or newer and npm
-- Python 3.9 or newer
+- React, Vite, Tailwind CSS, React Router, Axios, and Chart.js
+- Flask REST API, Flask-SQLAlchemy, Flask-JWT-Extended, SQLite
+- Render web service and static site deployment configuration
 
-## Backend setup
+## Local development (Windows PowerShell)
 
-In PowerShell, from the repository root:
+From the repository root:
 
 ```powershell
-cd backend
 py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-python run.py
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+if (-not (Test-Path backend\.env)) { Copy-Item backend\.env.example backend\.env }
 ```
 
-The API starts at `http://127.0.0.1:5000`. Its health endpoint is
-`http://127.0.0.1:5000/api/health`.
-
-## Authentication API
-
-- `POST /api/auth/register` accepts `full_name`, `email`, and `password`.
-  Public registration creates student accounts only; attempts to select
-  `health_personnel` or `admin` are rejected. Assign privileged roles only
-  through a trusted administrative process.
-- `POST /api/auth/login` accepts `email` and `password`, and returns a JWT
-  access token and safe user profile.
-- `GET /api/auth/me` returns the authenticated user's safe profile. Send the
-  login token in the `Authorization: Bearer <token>` header.
-
-Passwords must be 8–128 characters. Password hashes are stored; plaintext
-passwords and password hashes are never included in API responses. Access
-tokens expire after 30 minutes. Use unique `SECRET_KEY` and `JWT_SECRET_KEY`
-values from environment configuration outside local development.
-
-If PowerShell prevents virtual-environment activation, either enable script
-execution for your user according to your organization's policy or invoke
-`.venv\Scripts\python.exe` directly for the pip install and run commands.
-
-## Frontend setup
-
-Open a second PowerShell terminal from the repository root:
+In the first terminal, start the API:
 
 ```powershell
-cd frontend
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+Set-Location backend
+& "..\.venv\Scripts\python.exe" run.py
+```
+
+The API listens on `http://127.0.0.1:5000`; its health check is
+`http://127.0.0.1:5000/api/health`.
+
+In a second terminal from the repository root:
+
+```powershell
+if (-not (Test-Path frontend\.env)) { Copy-Item frontend\.env.example frontend\.env }
+Set-Location frontend
 npm install
 npm run dev
 ```
 
-Vite prints the local development URL, usually `http://localhost:5173`.
-`VITE_API_BASE_URL` in `frontend/.env` controls the API URL used by the Axios
-client; its default points to the local Flask backend.
+Open the Vite URL (usually `http://localhost:5173`). The SQLite database is
+stored in `backend/instance/our911.db` unless `DATABASE_URL` is set. Startup
+creates missing tables and applies additive SQLite column updates without
+deleting existing records.
 
-## Verify the setup
+### Accounts and roles
 
-With the backend running, request the health endpoint:
+Public registration creates student accounts. Create or promote a trusted
+staff account from a backend terminal with:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:5000/api/health
+& "..\.venv\Scripts\python.exe" -m flask --app run:app create-user
 ```
 
-Build the frontend in another terminal:
+The command prompts for name, email, role, and a hidden password. It supports
+`admin`, `health_personnel`, and `student`; do not share administrator access.
+
+## Application modules
+
+1. **Welcome and Dashboard** — sign in, create an account, continue with email,
+   or continue as a guest. The dashboard loads report, donor and facility
+   counts from the database and shows private recent activity to signed-in users.
+2. **First Aid Companion** — quick reference guidance for burns, bleeding,
+   fainting, choking, and possible fractures. It is not a substitute for
+   emergency services or professional training.
+3. **Incident Reporting** — signed-in users submit and track their own reports;
+   guests can submit an emergency report without an account but cannot retrieve
+   or track it. Authorized staff review the campus queue and add status history.
+   Staff can configure campus location choices.
+4. **Health Intelligence** — staff-only statistics, categories, trends, and
+   frequent locations computed from incident records. No reporter identity,
+   contact information, or confidential incident description is included.
+5. **DamuConnect** — volunteers manage their donor availability; authenticated
+   users can submit and track requests. Donor contact is restricted to
+   authorized health staff. Search results are preliminary discovery, not
+   blood compatibility guidance.
+6. **Health Facility Directory** — public search and details; administrators
+   manage records. Facilities are not seeded with fictional names or contacts,
+   and unverified records are labelled.
+
+## API overview
+
+- `POST /api/auth/register`, `POST /api/auth/login`, `GET|PATCH /api/auth/me`,
+  `POST /api/auth/change-password`
+- `GET /api/health`
+- `GET|POST /api/incidents`, `POST /api/incidents/guest`,
+  `GET /api/incidents/mine`, `GET /api/incidents/<id>`,
+  `PATCH /api/incidents/<id>/status`
+- `GET|POST /api/campus-zones`
+- `GET /api/intelligence/summary` (admin or health personnel)
+- `GET /api/facilities/summary`, `GET|POST /api/facilities`,
+  `GET|PATCH|DELETE /api/facilities/<id>`
+- `GET /api/damu/summary`
+- `GET /api/damu/donors/me`, `POST /api/damu/donors`,
+  `PATCH /api/damu/donors/me`
+- `GET /api/damu/admin/donors` (admin or health personnel)
+- `GET|POST /api/damu/requests`,
+  `PATCH /api/damu/requests/<id>/status`,
+  `GET|POST /api/damu/requests/<id>/matches`,
+  `PATCH /api/damu/matches/<id>`
+
+Protected endpoints require the valid login access token in the request
+authentication header. Access tokens expire after 30 minutes. Donor contact
+information and incident identities are only returned to the relevant account
+owner or authorized staff.
+
+## Tests and build
+
+From the repository root:
 
 ```powershell
-cd frontend
+Set-Location backend
+& "..\.venv\Scripts\python.exe" -m unittest discover -s tests -v
+Set-Location ..\frontend
 npm run build
 ```
 
-## Project layout
+## Deploy to Render
 
-- `frontend/` — Vite, React, Tailwind CSS, routing, and the shared Axios client.
-- `backend/run.py` — local Flask development entry point.
-- `backend/app/__init__.py` — Flask application factory and extension setup.
-- `backend/app/config.py` — environment-based configuration and SQLite default.
-- `backend/app/extensions.py` — shared SQLAlchemy and JWT extension instances.
-- `backend/app/auth/decorators.py` — JWT-protected role authorization decorator.
-- `backend/app/models/` — SQLAlchemy models for users, facilities, guides,
-  incidents, donors, blood requests, matches, and campus zones.
-- `backend/app/routes/auth.py` — registration, login, and current-user routes.
-- `backend/app/routes/health.py` — `GET /api/health` endpoint.
-- `backend/tests/` — backend API smoke test.
+The repository includes [render.yaml](./render.yaml) for a Flask API web
+service and a Vite static site. Review the blueprint before creating the
+services. In Render:
 
-The SQLite database is configured at `backend/instance/our911.db` by default
-and is ignored by git. The nine schema tables are created automatically when
-the Flask app starts. User passwords should be set with `User.set_password()`
-and checked with `User.check_password()`; only a password hash is stored.
-Run backend tests from the repository root with
-`.\.venv\Scripts\python.exe -m unittest discover -s backend\tests -v`.
-Copy the relevant `.env.example` to `.env` and set unique secret values before
-using this project beyond local development. Never commit `.env` files or real
-user data.
+1. Create a Blueprint deployment from this repository and review both services.
+2. The API service uses a persistent disk at `/var/data`; SQLite is suitable
+   here for a small, single-instance hackathon deployment. Do not remove the
+   disk or use SQLite for horizontally scaled instances.
+3. Set API `CORS_ORIGINS` to the exact deployed frontend origin, for example
+   `https://our-911-frontend.onrender.com`.
+4. Set the static service build variable `VITE_API_BASE_URL` to
+   `https://<your-api-service>.onrender.com/api`.
+5. Render generates `SECRET_KEY` and `JWT_SECRET_KEY` from the blueprint.
+   Keep both private and rotate them if exposed.
+6. After the API deploys, open its Shell and create the first staff account:
+   `flask --app run:app create-user`.
+
+The persistent disk keeps the SQLite data across restarts, but it does not
+replace backups. The application initializes tables and additive columns at
+startup, including a data-preserving rebuild to permit anonymous incident
+reports; it does not provide a general-purpose schema migration history.
+
+## Environment variables
+
+Backend settings are documented in `backend/.env.example`: `SECRET_KEY`,
+`JWT_SECRET_KEY`, `DATABASE_URL`, `CORS_ORIGINS`, and `FLASK_DEBUG`.
+`frontend/.env.example` contains `VITE_API_BASE_URL`. Never commit `.env` files,
+real user data, or production secrets.
+
+Google OAuth and email password-reset delivery are not configured. The Google
+sign-in option is intentionally unavailable until a real OAuth provider and
+server-side credentials are configured. Enabling it requires registering an
+OAuth client, storing `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` as private
+backend environment variables, and registering the API callback URL (for
+example, `https://<api-service>/api/auth/google/callback`) with Google. The
+backend must validate the provider response before issuing OUR 911 tokens; this
+callback is not currently implemented. The forgot-password page directs users
+to an administrator instead of pretending to send a reset email. Email sign-in
+uses the existing email/password flow; magic-link email delivery is not set up.

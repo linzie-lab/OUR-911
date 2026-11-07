@@ -32,6 +32,7 @@ class AuthEndpointTestCase(unittest.TestCase):
     def tearDown(self):
         with self.app.app_context():
             db.session.remove()
+            db.engine.dispose()
 
     def _register(self, **overrides):
         payload = {
@@ -151,6 +152,56 @@ class AuthEndpointTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["user"]["role"], "student")
         self.assertNotIn("password_hash", response.get_json()["user"])
+
+    def test_profile_update_and_password_change_require_valid_credentials(self):
+        self.assertEqual(self._register().status_code, 201)
+        login = self.client.post(
+            "/api/auth/login",
+            json={
+                "email": "student@example.test",
+                "password": "correct-horse-battery",
+            },
+        )
+        token = login.get_json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        updated = self.client.patch(
+            "/api/auth/me",
+            json={"full_name": "Updated Student"},
+            headers=headers,
+        )
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.get_json()["user"]["full_name"], "Updated Student")
+        self.assertNotIn("password_hash", updated.get_json()["user"])
+
+        rejected = self.client.post(
+            "/api/auth/change-password",
+            json={
+                "current_password": "incorrect",
+                "new_password": "a-new-valid-password",
+            },
+            headers=headers,
+        )
+        self.assertEqual(rejected.status_code, 401)
+        changed = self.client.post(
+            "/api/auth/change-password",
+            json={
+                "current_password": "correct-horse-battery",
+                "new_password": "a-new-valid-password",
+            },
+            headers=headers,
+        )
+        self.assertEqual(changed.status_code, 200)
+        self.assertEqual(
+            self.client.post(
+                "/api/auth/login",
+                json={
+                    "email": "student@example.test",
+                    "password": "a-new-valid-password",
+                },
+            ).status_code,
+            200,
+        )
 
     def test_role_decorator_enforces_database_role(self):
         self.assertEqual(

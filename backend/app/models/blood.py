@@ -35,11 +35,14 @@ class BloodRequest(TimestampMixin, db.Model):
         db.ForeignKey("facilities.id", ondelete="SET NULL"),
         nullable=True,
     )
+    facility_name = db.Column(db.String(160))
     blood_type = db.Column(db.String(3), nullable=False)
     units_requested = db.Column(db.Integer, nullable=False)
     priority = db.Column(db.String(16), nullable=False, default="medium")
     status = db.Column(db.String(32), nullable=False, default="open")
     needed_by = db.Column(db.DateTime(timezone=True))
+    contact_name = db.Column(db.String(120))
+    contact_phone = db.Column(db.String(32))
     notes = db.Column(db.Text)
 
     requested_by = db.relationship("User", back_populates="blood_requests")
